@@ -1,6 +1,6 @@
 # react-learn
 
-学习react源码,  先从读代码开始，从react16源码细读
+学习react源码,  先从读代码开始，从react17.0源码细读
 
 > [导学](https://www.bilibili.com/video/BV1Ki4y1u7Vr/?vd_source=dabdcdd419ed3bc022bc41c4fd99a0be)
 
@@ -8,13 +8,11 @@
 2. 个人xmind笔记(wps)
 3. [build-your-own-react](https://pomb.us/build-your-own-react/)
 
-## react16.8学习
+## react17学习
 
 直接在react源码中标注研究即可
 
-
-
-## react17版本对比
+## react16版本对比
 
 
 
