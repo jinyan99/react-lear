@@ -305,6 +305,8 @@ export function render(
       );
     }
   }
+  // container指ReactDOM.render的第二个参数（即应用挂载的DOM节点）
+  // R1: 渲染子树方法 ：方法中-创建fiberRootNode和rootFiber
   return legacyRenderSubtreeIntoContainer(
     null,
     element,
