@@ -38,8 +38,13 @@ function FiberNode(
   // 作为动态的工作单元的属性
   this.pendingProps = pendingProps; // 等待更新的props
   this.memoizedProps = null; // 计算好的最终props新值
-  this.updateQueue = null; // 存放该节点要更新的Update链表的queue链表
-  this.memoizedState = null; // 产生更新时Update对象经过链表计算后的最终新的的state存放在这里
+
+  // class组件宿主组件存储 updates 的地方，是以queue为类型保存的
+  this.updateQueue: queue = null; // 1. 先存放completeWork阶段的updatePayload数组  2. 再存放该节点要更新的Update链表的queue链表即下文的 queue 值
+
+  // 函数组件存储 updates 的地方，是以hook为类型保存的
+  this.memoizedState: hook = null; // FunctionComponent对应fiber保存的Hooks链表 即下文的 hook 结构组成的链表
+
   this.dependencies = null;
 
   this.mode = mode;
@@ -57,6 +62,29 @@ function FiberNode(
   // 指向该fiber在另一次更新时对应的fiber
   this.alternate = null;
 }
+
+const hook = {
+  // 保存update的queue，即上文介绍的queue
+  queue: {
+    pending: null// pending连接的就是环状单向update组成的链表。为什么环状方便遍历
+  },
+  // 保存hook对应的state或effects链表
+  memoizedState: initialState,
+  // 与下一个Hook连接形成单向无环链表
+  next: null
+}
+
+// 类组件宿主组件的存储更新对象的属性
+const queue: UpdateQueue<State> = {
+    baseState: fiber.memoizedState,
+    firstBaseUpdate: null,
+    lastBaseUpdate: null,
+    shared: {
+      // 保存update的链表
+      pending: null,
+    },
+    effects: null,
+  };
 ```
 
 ## react16版本对比
