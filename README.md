@@ -87,6 +87,11 @@ const queue: UpdateQueue<State> = {
   };
 ```
 
+### 调试源码
+
+1. 根据文档教程，先构建完包，react内link一下，再去cra项目中link下你构建完的17版的包即可
+2. 新脚手架用得react18语法，所以改成17的语法就行
+
 ## react16版本对比
 
 ## react18对比
