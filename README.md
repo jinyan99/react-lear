@@ -49,10 +49,10 @@ function FiberNode(
 
   this.mode = mode;
 
-  this.effectTag = NoEffect;
+  this.effectTag = NoEffect; // 如Update标记，Placement标记
   this.nextEffect = null;
 
-  this.firstEffect = null;
+  this.firstEffect = null; // 存储effectList链表的，commit阶段只要遍历这个链表，即可完成渲染dom
   this.lastEffect = null;
 
   // 调度优先级相关
