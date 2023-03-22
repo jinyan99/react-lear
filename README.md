@@ -8,6 +8,8 @@
 2. 个人xmind笔记(wps)
 3. [build-your-own-react，构建迷你react，仅几百行代码](https://pomb.us/build-your-own-react/)
 
+## 白行代码构建mini-react
+
 ## react17学习
 
 直接在react源码中标注研究即可
@@ -91,7 +93,5 @@ const queue: UpdateQueue<State> = {
 
 1. 根据文档教程，先构建完包，react内link一下，再去cra项目中link下你构建完的17版的包即可
 2. 新脚手架用得react18语法，所以改成17的语法就行
-
-## react16版本对比
 
 ## react18对比
