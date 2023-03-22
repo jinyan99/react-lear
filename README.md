@@ -2,96 +2,22 @@
 
 学习react源码,  先从读代码开始，从react17.0源码细读
 
-> [导学](https://www.bilibili.com/video/BV1Ki4y1u7Vr/?vd_source=dabdcdd419ed3bc022bc41c4fd99a0be)
+> 参考 [build-your-own-react，构建迷你react，仅几百行代码](https://pomb.us/build-your-own-react/)
 
-1. [参考链接](https://react.iamkasong.com/#%E7%AB%A0%E8%8A%82%E5%88%97%E8%A1%A8)
-2. 个人xmind笔记(wps)
-3. [build-your-own-react，构建迷你react，仅几百行代码](https://pomb.us/build-your-own-react/)
+## 百行代码构建mini-react
 
-## 白行代码构建mini-react
+### 1. 创建createElement方法
 
-## react17学习
+### 2. 创建render方法
 
-直接在react源码中标注研究即可
+### 3. 实现Concurrent Mode
 
-```js
-// fiber 数据结构，了解了他，react基本上也懂差不多了
-function FiberNode(
-  tag: WorkTag,
-  pendingProps: mixed,
-  key: null | string,
-  mode: TypeOfMode,
-) {
-  // 作为静态数据结构的属性
-  this.tag = tag;
-  this.key = key;
-  this.elementType = null;
-  this.type = null;
-  this.stateNode = null;
+### 4. 实现Fiber架构
 
-  // 用于连接其他Fiber节点形成Fiber树
-  this.return = null;
-  this.child = null;
-  this.sibling = null;
-  this.index = 0;
+### 5. 实现 Render(协调器) 与Commit(渲染器) 两大核心阶段
 
-  this.ref = null;
+### 6. 实现diff算法 - Reconcilation
 
-  // 作为动态的工作单元的属性
-  this.pendingProps = pendingProps; // 等待更新的props
-  this.memoizedProps = null; // 计算好的最终props新值
+### 7. 实现函数式组件化
 
-  // class组件宿主组件存储 updates 的地方，是以queue为类型保存的
-  this.updateQueue: queue = null; // 1. 先存放completeWork阶段的updatePayload数组  2. 再存放该节点要更新的Update链表的queue链表即下文的 queue 值
-
-  // 函数组件存储 updates 的地方，是以hook为类型保存的
-  this.memoizedState: hook = null; // FunctionComponent对应fiber保存的Hooks链表 即下文的 hook 结构组成的链表
-
-  this.dependencies = null;
-
-  this.mode = mode;
-
-  this.effectTag = NoEffect; // 如Update标记，Placement标记
-  this.nextEffect = null;
-
-  this.firstEffect = null; // 存储effectList链表的，commit阶段只要遍历这个链表，即可完成渲染dom
-  this.lastEffect = null;
-
-  // 调度优先级相关
-  this.lanes = NoLanes;
-  this.childLanes = NoLanes;
-
-  // 指向该fiber在另一次更新时对应的fiber
-  this.alternate = null;
-}
-
-const hook = {
-  // 保存update的queue，即上文介绍的queue
-  queue: {
-    pending: null// pending连接的就是环状单向update组成的链表。为什么环状方便遍历
-  },
-  // 保存hook对应的state或effects链表
-  memoizedState: initialState,
-  // 与下一个Hook连接形成单向无环链表
-  next: null
-}
-
-// 类组件宿主组件的存储更新对象的属性
-const queue: UpdateQueue<State> = {
-    baseState: fiber.memoizedState,
-    firstBaseUpdate: null,
-    lastBaseUpdate: null,
-    shared: {
-      // 保存update的链表
-      pending: null,
-    },
-    effects: null,
-  };
-```
-
-### 调试源码
-
-1. 根据文档教程，先构建完包，react内link一下，再去cra项目中link下你构建完的17版的包即可
-2. 新脚手架用得react18语法，所以改成17的语法就行
-
-## react18对比
+### 8. 实现 Hooks 能力
