@@ -4,6 +4,7 @@ const MyReact = {
   render,
   concurrentRender,
   concurrentRender2,
+  useState,
 };
 
 /**
@@ -330,8 +331,12 @@ function updateDom(dom, prevProps, nextProps) {
     2. 子函数来自于运行函数，而不是直接从props中获取
  */
 // ================= END： 使用react渲染组件到页面上 ================================================================
-
+let wipFiber = null;
+let hookIndex = null;
 function updateFunctionComponent(fiber) {
+  wipFiber = fiber;
+  hookIndex = 0;
+  wipFiber.hooks = [];
   const children = [fiber.type(fiber.props)];
   reconcileChildren(fiber, children);
 }
@@ -352,9 +357,48 @@ function commitDeletion(fiber, domParent) {
 }
 
 /** @jsx Didact.createElement 使用函数组件 */
-// function App(props) {
-//     return <h1>Hi {props.name}</h1>
-//   }
-//   const element = <App name="foo" />
+// function Counter() {
+//   const [state, setState] = Didact.useState(1);
+//   return <h1 onClick={() => setState((c) => c + 1)}>Count: {state}</h1>;
+// }
+// const element = <Counter />;
 //   const container = document.getElementById("root")
 //   Didact.render(element, container)
+
+/**
+ * 【8节】增加hooks状态
+ * 1. 现在我们有了函数组件，让我们添加状态。
+ */
+
+function useState(initial) {
+  const oldHook =
+    wipFiber.alternate &&
+    wipFiber.alternate.hooks &&
+    wipFiber.alternate.hooks[hookIndex];
+  const hook = {
+    state: oldHook ? oldHook.state : initial,
+    queue: [],
+  };
+
+  // 我们在下次渲染组件时这样做，我们从旧钩子队列中获得所有的动作，
+  // 然后将它们一个接一个地应用到新的钩子状态，所以当我们返回状态时，它就更新了。
+  const actions = oldHook ? oldHook.queue : [];
+  actions.forEach((action) => {
+    hook.state = action(hook.state);
+  });
+
+  const setState = (action) => {
+    hook.queue.push(action);
+    wipRoot = {
+      dom: currentRoot.dom,
+      props: currentRoot.props,
+      alternate: currentRoot,
+    };
+    nextUnitOfWork = wipRoot;
+    deletions = [];
+  };
+
+  wipFiber.hooks.push(hook);
+  hookIndex++;
+  return [hook.state, setState];
+}

@@ -3,6 +3,7 @@
 学习react源码,  先从读代码开始，从react17.0源码细读
 
 > 参考 [build-your-own-react，构建迷你react，仅几百行代码](https://pomb.us/build-your-own-react/)
+> [参考github源码](https://github.com/chinanf-boy/didact)
 
 ## 百行代码构建mini-react
 
