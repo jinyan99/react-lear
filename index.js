@@ -2,6 +2,8 @@
 const MyReact = {
   createElement,
   render,
+  concurrentRender,
+  concurrentRender2
 };
 
 /**
@@ -97,10 +99,16 @@ function concurrentRender(element, container) {
   };
 }
 
+// ================================ 全局变量区 START ================================
 /** 每个工作单元存放的就是fiber节点结构-链表 */
 let nextUnitOfWork = null;
 /** 新增内存中正在进行的工作根节点fiber树 */
 let wipRoot = null;
+/** 当前屏幕上fiber树的根节点引用--方便后面新旧对比 */
+let currentRoot = null;
+/** 需要一个数组来跟踪我们想要移除的节点。 */
+let deletions = null;
+// ================================ 全局变量区 END ====================================
 
 function workLoop(deadline) {
   // 实现异步可中断递归
@@ -112,7 +120,7 @@ function workLoop(deadline) {
   // 一旦我们完成了所有的工作(我们知道这一点，因为没有下一个工作单元)，我们就将整个fiber树提交给专门的批量DOM操作方法-----即不让他在performUnitOfWork中串行的操作dom了。
   if (!nextUnitOfWork && wipRoot) {
     // 将根fiber树交给dom操作方法
-    commitRoot()
+    commitRoot();
   }
 
   requestIdleCallback(workLoop);
@@ -135,35 +143,13 @@ function performUnitOfWork(fiber) {
   }
 
   // 为了后面在提交阶段批量更新dom提高性能：这块需要删掉操作dom的部分
-//   if (fiber.parent) {
-//     fiber.parent.dom.appendChild(fiber.dom);
-//   }
+  //   if (fiber.parent) {
+  //     fiber.parent.dom.appendChild(fiber.dom);
+  //   }
   // 2- TODO create new fibers
   const elements = fiber.props.children;
-  let index = 0;
-  let prevSibling = null;
+  reconcileChildren(fiber, elements);
 
-  while (index < elements.length) {
-    const element = elements[index];
-
-    // 创建fiber节点 --- 【核心】
-    const newFiber = {
-      type: element.type,
-      props: element.props,
-      parent: fiber,
-      dom: null,
-    };
-
-    // 我们把它添加到纤维树中设置它是子结点还是兄弟结点，取决于它是不是第一个子结点。
-    if (index === 0) {
-      fiber.child = newFiber;
-    } else {
-      prevSibling.sibling = newFiber;
-    }
-
-    prevSibling = newFiber;
-    index++;
-  }
   // 3- 返回下一个工作单元
   // 我们先尝试孩子，然后是兄弟姐妹，然后是叔叔
   if (fiber.child) {
@@ -191,7 +177,10 @@ function concurrentRender2(element, container) {
     props: {
       children: [element],
     },
+    // 根节点添加交替属性
+    alternate: currentRoot,
   };
+  deletions = [];
   nextUnitOfWork = wipRoot;
 }
 
@@ -200,7 +189,9 @@ function concurrentRender2(element, container) {
  * 目的：我们在commitRoot函数中执行。这里我们递归地将所有节点附加到dom。
  */
 function commitRoot() {
+  deletions.forEach(commitWork);
   commitWork(wipRoot.child);
+  currentRoot = wipRoot;
   wipRoot = null;
 }
 
@@ -209,29 +200,131 @@ function commitWork(fiber) {
     return;
   }
   const domParent = fiber.parent.dom;
-  domParent.appendChild(fiber.dom);
+
+  if (fiber.effectTag === "PLACEMENT" && fiber.dom != null) {
+    domParent.appendChild(fiber.dom);
+  } else if (fiber.effectTag === "UPDATE" && fiber.dom != null) {
+    updateDom(fiber.dom, fiber.alternate.props, fiber.props);
+  } else if (fiber.effectTag === "DELETION") {
+    domParent.removeChild(fiber.dom);
+  }
+
   commitWork(fiber.child);
   commitWork(fiber.sibling);
 }
 
+/**
+ * 【6节】实现Reconcilor：协调器Diff算法（主要就是解决更新dom的高效算法）
+ * 1. 问题：到目前为止，我们只是向DOM添加了一些东西，那么更新或删除节点呢?
+ * 2. 要做的：我们需要比较我们在渲染函数中接收到的元素和我们提交给DOM的最后一个fiber树，达到更新删除的功能
+ * ACTION
+ * 1. 创建currentRoot全局变量：我们需要在完成提交后保存对“我们提交给DOM的最后一棵fiber树”的引用。我们称之为currentRoot。
+ * 2. 将正在进行fiber树根节点：加了交替属性。此属性是到旧fiber树的链接，即我们在前一个提交阶段提交给DOM的fiber树。
+ */
 
+// 6.1 重构performUnitOfWork
+//     1. 从中提取创建fiber节点的代码
+//     2. 重构：在这里协调新旧元素，尽可能的复用已有的节点，最后产出新旧混合的新fiber树
+/**
+ * 协调思路：
+ * 1. 同时遍历2个数据结构：旧fiber树的子树链表 和 新的jsx对应的elements元素数组
+ */
+function reconcileChildren(wipFiber, elements) {
+  let index = 0;
+  let oldFiber = wipFiber.alternate && wipFiber.alternate.child;
+  let prevSibling = null;
 
+  // 0. 同时遍历
+  while (index < elements.length || oldFiber != null) {
+    const element = elements[index];
+    let newFiber = null;
 
+    // 1. compare oldFiber to element
+    const sameType = oldFiber && element && element.type == oldFiber.type;
 
+    if (sameType) {
+      // 1-1. update the node
+      newFiber = {
+        type: oldFiber.type,
+        props: element.props,
+        dom: oldFiber.dom,
+        parent: wipFiber,
+        alternate: oldFiber,
+        effectTag: "UPDATE",
+      };
+    }
+    if (element && !sameType) {
+      // 1-2 add this node
+      newFiber = {
+        type: element.type,
+        props: element.props,
+        dom: null,
+        parent: wipFiber,
+        alternate: null,
+        effectTag: "PLACEMENT",
+      };
+    }
+    if (oldFiber && !sameType) {
+      // 1-3 delete the oldFiber's node
+      oldFiber.effectTag = "DELETION";
+      deletions.push(oldFiber);
+    }
 
+    if (oldFiber) {
+      oldFiber = oldFiber.sibling;
+    }
 
+    if (index === 0) {
+      wipFiber.child = newFiber;
+    } else if (element) {
+      prevSibling.sibling = newFiber;
+    }
 
+    prevSibling = newFiber;
+    index++;
+  }
+}
 
+const isEvent = (key) => key.startsWith("on");
+const isProperty = (key) => key !== "children" && !isEvent(key);
+const isNew = (prev, next) => (key) => prev[key] !== next[key];
+const isGone = (prev, next) => (key) => !(key in next);
+/**
+ * 如果它是一个UPDATE，我们需要用已更改的props更新现有的DOM节点。--
+ * 我们将旧纤维中的道具与新纤维中的道具进行比较，删除已经消失的道具，并设置新的或更改的道具。
+ */
+function updateDom(dom, prevProps, nextProps) {
+  //Remove old or changed event listeners
+  Object.keys(prevProps)
+    .filter(isEvent)
+    .filter((key) => !(key in nextProps) || isNew(prevProps, nextProps)(key))
+    .forEach((name) => {
+      const eventType = name.toLowerCase().substring(2);
+      dom.removeEventListener(eventType, prevProps[name]);
+    });
+  // Remove old properties
+  Object.keys(prevProps)
+    .filter(isProperty)
+    .filter(isGone(prevProps, nextProps))
+    .forEach((name) => {
+      dom[name] = "";
+    });
 
-
-
-
-
-
-
-
-
-
-
+  // Set new or changed properties
+  Object.keys(nextProps)
+    .filter(isProperty)
+    .filter(isNew(prevProps, nextProps))
+    .forEach((name) => {
+      dom[name] = nextProps[name];
+    });
+  // Add event listeners
+  Object.keys(nextProps)
+    .filter(isEvent)
+    .filter(isNew(prevProps, nextProps))
+    .forEach((name) => {
+      const eventType = name.toLowerCase().substring(2);
+      dom.addEventListener(eventType, nextProps[name]);
+    });
+}
 
 // ================= END： 使用react渲染组件到页面上 =================================================================
