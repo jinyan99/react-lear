@@ -99,6 +99,8 @@ function concurrentRender(element, container) {
 
 /** 每个工作单元存放的就是fiber节点结构-链表 */
 let nextUnitOfWork = null;
+/** 新增内存中正在进行的工作根节点fiber树 */
+let wipRoot = null;
 
 function workLoop(deadline) {
   // 实现异步可中断递归
@@ -107,6 +109,12 @@ function workLoop(deadline) {
     nextUnitOfWork = performUnitOfWork(nextUnitOfWork);
     shouldYield = deadline.timeRemaining() < 1;
   }
+  // 一旦我们完成了所有的工作(我们知道这一点，因为没有下一个工作单元)，我们就将整个fiber树提交给专门的批量DOM操作方法-----即不让他在performUnitOfWork中串行的操作dom了。
+  if (!nextUnitOfWork && wipRoot) {
+    // 将根fiber树交给dom操作方法
+    commitRoot()
+  }
+
   requestIdleCallback(workLoop);
 }
 
@@ -126,9 +134,10 @@ function performUnitOfWork(fiber) {
     fiber.dom = createDom(fiber);
   }
 
-  if (fiber.parent) {
-    fiber.parent.dom.appendChild(fiber.dom);
-  }
+  // 为了后面在提交阶段批量更新dom提高性能：这块需要删掉操作dom的部分
+//   if (fiber.parent) {
+//     fiber.parent.dom.appendChild(fiber.dom);
+//   }
   // 2- TODO create new fibers
   const elements = fiber.props.children;
   let index = 0;
@@ -168,5 +177,61 @@ function performUnitOfWork(fiber) {
     nextFiber = nextFiber.parent;
   }
 }
+
+/**
+ * 5. 创建Render与Commit两大阶段
+ *    5-1: 解决目前问题：上面performUnitOfWork方法每次处理一个元素时，我们都会向DOM添加一个新节点。而且，请记住，浏览器可能会在我们完成渲染整个树
+ *         之前中断我们的工作。在这种情况下，用户将看到一个不完整的UI。我们不希望这样。
+ *    5-2: 我们需要从performUnitOfWork里删除改变DOM的部分。需要重构下改变dom的部分
+ */
+function concurrentRender2(element, container) {
+  // 先改名wipRoot：正在进行的工作根节点
+  wipRoot = {
+    dom: container,
+    props: {
+      children: [element],
+    },
+  };
+  nextUnitOfWork = wipRoot;
+}
+
+/**
+ * 创建commitRoot方法
+ * 目的：我们在commitRoot函数中执行。这里我们递归地将所有节点附加到dom。
+ */
+function commitRoot() {
+  commitWork(wipRoot.child);
+  wipRoot = null;
+}
+
+function commitWork(fiber) {
+  if (!fiber) {
+    return;
+  }
+  const domParent = fiber.parent.dom;
+  domParent.appendChild(fiber.dom);
+  commitWork(fiber.child);
+  commitWork(fiber.sibling);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 // ================= END： 使用react渲染组件到页面上 =================================================================
