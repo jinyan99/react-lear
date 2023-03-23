@@ -3,7 +3,7 @@ const MyReact = {
   createElement,
   render,
   concurrentRender,
-  concurrentRender2
+  concurrentRender2,
 };
 
 /**
@@ -137,21 +137,12 @@ requestIdleCallback(workLoop);
  *  3. 返回下一个工作单元（孩子兄弟叔叔的顺序）
  */
 function performUnitOfWork(fiber) {
-  // 1- TODO add dom node
-  if (!fiber.dom) {
-    fiber.dom = createDom(fiber);
+  const isFunctionComponent = fiber.type instanceof Function;
+  if (isFunctionComponent) {
+    updateFunctionComponent(fiber);
+  } else {
+    updateHostComponent(fiber);
   }
-
-  // 为了后面在提交阶段批量更新dom提高性能：这块需要删掉操作dom的部分
-  //   if (fiber.parent) {
-  //     fiber.parent.dom.appendChild(fiber.dom);
-  //   }
-  // 2- TODO create new fibers
-  const elements = fiber.props.children;
-  reconcileChildren(fiber, elements);
-
-  // 3- 返回下一个工作单元
-  // 我们先尝试孩子，然后是兄弟姐妹，然后是叔叔
   if (fiber.child) {
     return fiber.child;
   }
@@ -199,14 +190,19 @@ function commitWork(fiber) {
   if (!fiber) {
     return;
   }
-  const domParent = fiber.parent.dom;
+
+  let domParentFiber = fiber.parent;
+  while (!domParentFiber.dom) {
+    domParentFiber = domParentFiber.parent;
+  }
+  const domParent = domParentFiber.dom;
 
   if (fiber.effectTag === "PLACEMENT" && fiber.dom != null) {
     domParent.appendChild(fiber.dom);
   } else if (fiber.effectTag === "UPDATE" && fiber.dom != null) {
     updateDom(fiber.dom, fiber.alternate.props, fiber.props);
   } else if (fiber.effectTag === "DELETION") {
-    domParent.removeChild(fiber.dom);
+    commitDeletion(fiber, domParent);
   }
 
   commitWork(fiber.child);
@@ -327,4 +323,38 @@ function updateDom(dom, prevProps, nextProps) {
     });
 }
 
-// ================= END： 使用react渲染组件到页面上 =================================================================
+/**
+ * [8节] 实现支持函数时组件化
+ * 8.1 函数组件有两个不同之处:
+    1. 来自函数组件的fiber没有DOM节点
+    2. 子函数来自于运行函数，而不是直接从props中获取
+ */
+// ================= END： 使用react渲染组件到页面上 ================================================================
+
+function updateFunctionComponent(fiber) {
+  const children = [fiber.type(fiber.props)];
+  reconcileChildren(fiber, children);
+}
+
+function updateHostComponent(fiber) {
+  if (!fiber.dom) {
+    fiber.dom = createDom(fiber);
+  }
+  reconcileChildren(fiber, fiber.props.children);
+}
+
+function commitDeletion(fiber, domParent) {
+  if (fiber.dom) {
+    domParent.removeChild(fiber.dom);
+  } else {
+    commitDeletion(fiber.child, domParent);
+  }
+}
+
+/** @jsx Didact.createElement 使用函数组件 */
+// function App(props) {
+//     return <h1>Hi {props.name}</h1>
+//   }
+//   const element = <App name="foo" />
+//   const container = document.getElementById("root")
+//   Didact.render(element, container)
