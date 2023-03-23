@@ -53,7 +53,7 @@ function render(element, container) {
 }
 
 /**
- * 4. 为了组件工作单元，我们需要一个数据结构：fiber树
+ * 4. 为了组件工作单元，我们需要将上面render里的element数据结构改变为一个新的数据结构：fiber树结构（链表型siblingreturnchild...）
  *  4-1、每一个元素都是fibr节点，每个fiber节点都对应一个工作单元
  *
  *  4-2. 在渲染中，我们将从根节点开始创建根光纤，并将其设置为初始nextUnitOfWork。剩下的工作将发生在performUnitOfWork函数上，在那里我们将为每个光纤做三件事:
@@ -80,9 +80,15 @@ function createDom(fiber) {
   return dom;
 }
 
-// 重构为异步可中断的render
+/**
+ * 重构为异步可中断的 render，执行此函数就是设置全局变量 nextUnitOfWork 的执行初始值
+ * @param {*} element
+ * @param {*} container
+ * 在渲染函数中，我们将nextUnitOfWork设置为fiber树的根
+ */
 function concurrentRender(element, container) {
   // TODO set next unit of work
+  // 赋值fiber树的链表头部fiber即根节点，暂时将fiber结构简写为包含dom和props两个属性
   nextUnitOfWork = {
     dom: container,
     props: {
@@ -91,8 +97,11 @@ function concurrentRender(element, container) {
   };
 }
 
+/** 每个工作单元存放的就是fiber节点结构-链表 */
 let nextUnitOfWork = null;
+
 function workLoop(deadline) {
+  // 实现异步可中断递归
   let shouldYield = false;
   while (nextUnitOfWork && !shouldYield) {
     nextUnitOfWork = performUnitOfWork(nextUnitOfWork);
@@ -103,6 +112,14 @@ function workLoop(deadline) {
 
 requestIdleCallback(workLoop);
 
+/**
+ * 实现异步中断渲染的最核心的方法---代替上面的render
+ * 目的：就是将你写的组件里的虚拟dom更高效的挂载到页面dom容器中
+ * 主要做3件事：
+ *  1. 添加dom节点
+ *  2. 创建fiber节点
+ *  3. 返回下一个工作单元（孩子兄弟叔叔的顺序）
+ */
 function performUnitOfWork(fiber) {
   // 1- TODO add dom node
   if (!fiber.dom) {
@@ -120,6 +137,7 @@ function performUnitOfWork(fiber) {
   while (index < elements.length) {
     const element = elements[index];
 
+    // 创建fiber节点 --- 【核心】
     const newFiber = {
       type: element.type,
       props: element.props,
@@ -137,7 +155,8 @@ function performUnitOfWork(fiber) {
     prevSibling = newFiber;
     index++;
   }
-  // 3- TODO return next unit of work
+  // 3- 返回下一个工作单元
+  // 我们先尝试孩子，然后是兄弟姐妹，然后是叔叔
   if (fiber.child) {
     return fiber.child;
   }
